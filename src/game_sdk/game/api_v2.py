@@ -159,6 +159,34 @@ class GAMEClientV2:
 
         return self._get_response_body(response)
     
+    def save_message(self, conversation_id: str, message: dict) -> dict:
+        """
+        Guarda un mensaje en el historial de la conversación
+        message debe contener: 
+        {
+            "role": "user" | "assistant",
+            "content": str
+        }
+        """
+        response = requests.post(
+            f"{self.base_url}/conversation/{conversation_id}/history",
+            headers=self.headers,
+            json={
+                "data": message
+            }
+        )
+        return self._get_response_body(response)
+
+    def get_chat_history(self, conversation_id: str) -> List[dict]:
+        """
+        Obtiene todo el historial de la conversación
+        """
+        response = requests.get(
+            f"{self.base_url}/conversation/{conversation_id}/history",
+            headers=self.headers
+        )
+        return self._get_response_body(response).get("messages", [])
+    
     def _get_response_body(self, response: requests.Response) -> dict:
         if response.status_code != 200:
             raise ValueError(f"Failed to get response body (status {response.status_code}). Response: {response.text}")

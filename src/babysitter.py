@@ -2,8 +2,9 @@ import httpx
 import asyncio
 import os
 from decimal import Decimal
-from typing import Dict, Any, Tuple, Optional
-from game_sdk.game.custom_types import FunctionResultStatus
+from typing import Dict, Any, Tuple, Optional, List
+from game_sdk.game.custom_types import FunctionResultStatus, AgentMessage
+from game_sdk.game.chat_agent import Chat
 
 class Babysitter:
     def __init__(self, api_url: str):
@@ -15,28 +16,30 @@ class Babysitter:
         from_address: str,
         to_address: str, 
         amount: float,
-        conversation_history: list,
+        chat: Chat,
     ) -> Tuple[bool, str]:
         """
-        Valida una transacción consultando la API externa (versión sincrónica)
+        Valida una transacción consultando la API externa
         """
-        print(f"\n🔄 Iniciando validación de transacción:")
-        print(f"   De: {from_address}")
-        print(f"   Para: {to_address}")
-        print(f"   Monto: {amount} ETH")
-        print(f"   Historial de conversación: {conversation_history}")
+        # Obtener el historial del chat
+        messages = chat.get_history()
         
-        # Convertir el amount a wei usando Decimal para evitar errores de precisión
-        amount_in_wei = str(Decimal(str(amount)) * Decimal('1000000000000000000'))
+        # Construir el reason con el historial
+        conversation = []
+        for msg in messages:
+            role = "Usuario" if msg["role"] == "user" else "Asistente"
+            conversation.append(f"{role}: {msg['content']}")
+        
+        reason = "\n".join(conversation)
         
         tx_data = {
             "safeAddress": from_address,
             "erc20TokenAddress": "ETH",
-            "reason": "\n".join(conversation_history) if conversation_history else "No conversation history",
+            "reason": reason,
             "transactions": [{
                 "to": to_address,
                 "data": "",
-                "value": amount_in_wei
+                "value": str(Decimal(str(amount)) * Decimal('1000000000000000000'))
             }]
         }
         
@@ -72,7 +75,7 @@ def wrap_send_native(
     original_fn,
     babysitter: Babysitter,
     wallet_address: str,
-    conversation_history: Optional[list] = None
+    chat: Chat,
 ) -> callable:
     """
     Envuelve la función original de envío con la validación del babysitter
@@ -84,12 +87,11 @@ def wrap_send_native(
         print(f"   Monto: {amount} ETH")
         
         try:
-            # Validar primero con el babysitter
             is_valid, message = babysitter.validate_transaction(
                 from_address=wallet_address,
                 to_address=to_address,
                 amount=amount,
-                conversation_history=conversation_history or []
+                chat=chat
             )
             
             if not is_valid:
@@ -97,7 +99,6 @@ def wrap_send_native(
                 return FunctionResultStatus.FAILED, f"Transacción rechazada: {message}", {}
             
             print("✅ Transacción aprobada por babysitter, procediendo con el envío...")
-            # Si pasa la validación, ejecutar la función original
             return original_fn(to_address, amount)
             
         except Exception as e:

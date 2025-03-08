@@ -20,14 +20,25 @@ class Chat:
     ):
         self.chat_id = conversation_id
         self.client = client
-        self.action_space = (
-            {f.fn_name: f for f in action_space} if action_space else None
-        )
+        self.action_space = {f.fn_name: f for f in action_space} if action_space else None
         self.get_state_fn = get_state_fn
+        self.conversation_history = []  # Agregamos el historial localmente
 
     def next(self, message: str) -> ChatResponse:
+        # Guardamos el mensaje del usuario localmente
+        self.conversation_history.append({
+            "role": "user",
+            "content": message
+        })
 
         convo_response = self._update_conversation(message)
+
+        # Guardamos la respuesta del asistente localmente
+        if convo_response.message:
+            self.conversation_history.append({
+                "role": "assistant",
+                "content": convo_response.message
+            })
 
         # execute functions/actions if present
         if convo_response.function_call:
@@ -100,6 +111,10 @@ class Chat:
         if not message:
             raise Exception("Agent did not return a message for the function report.")
         return message
+
+    def get_history(self) -> List[Dict[str, str]]:
+        """Obtiene el historial de la conversación"""
+        return self.conversation_history
 
 
 class ChatAgent:

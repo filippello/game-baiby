@@ -140,30 +140,6 @@ def send_native(to_address: str, amount: float) -> Tuple[FunctionResultStatus, s
         print(f"❌ Traceback completo: {traceback.format_exc()}")
         return FunctionResultStatus.FAILED, f"Error en la transacción: {str(e)}", {}
 
-# Modificar action_space
-action_space = [
-    Function(
-        fn_name="check_balance",
-        fn_description="Consultar el balance de ETH de la dirección actual",
-        args=[],
-        executable=check_balance,
-    ),
-    Function(
-        fn_name="send_native",
-        fn_description="Enviar ETH a una dirección",
-        args=[
-            Argument(name="to_address", description="Dirección destino"),
-            Argument(name="amount", description="Cantidad de ETH a enviar")
-        ],
-        executable=wrap_send_native(
-            send_native,
-            babysitter,
-            wallet_address=account.address,
-            conversation_history=conversation_history
-        ),
-    )
-]
-
 # Crear el agente
 agent = ChatAgent(
     prompt=f"""Eres un asistente blockchain que opera con la wallet {account.address}.
@@ -188,8 +164,34 @@ agent = ChatAgent(
 chat = agent.create_chat(
     partner_id="blockchain_user",
     partner_name="Usuario",
-    action_space=action_space,
 )
+
+# Luego configuramos el action_space con los mensajes del chat
+action_space = [
+    Function(
+        fn_name="check_balance",
+        fn_description="Consultar el balance de ETH de la dirección actual",
+        args=[],
+        executable=check_balance,
+    ),
+    Function(
+        fn_name="send_native",
+        fn_description="Enviar ETH a una dirección",
+        args=[
+            Argument(name="to_address", description="Dirección destino"),
+            Argument(name="amount", description="Cantidad de ETH a enviar")
+        ],
+        executable=wrap_send_native(
+            send_native,
+            babysitter,
+            wallet_address=account.address,
+            chat=chat  # Pasamos el objeto chat completo
+        ),
+    )
+]
+
+# Actualizamos el chat con el action_space
+chat.action_space = {f.fn_name: f for f in action_space}
 
 print(f"Dirección de la wallet: {account.address}")
 print("\n¡Bienvenido al Chat Blockchain! Escribe 'salir' para terminar.")
