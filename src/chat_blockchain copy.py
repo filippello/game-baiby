@@ -1,5 +1,5 @@
 import os
-from typing import Any, Tuple, Dict
+from typing import Any, Tuple
 from dotenv import load_dotenv
 from pathlib import Path
 from game_sdk.game.chat_agent import ChatAgent
@@ -7,7 +7,6 @@ from game_sdk.game.custom_types import Argument, Function, FunctionResultStatus
 from web3 import Web3
 from eth_account import Account
 from eth_account.signers.local import LocalAccount
-from babysitter import Babysitter, wrap_send_native
 
 # Importaciones de goat
 from goat_adapters.langchain import get_on_chain_tools
@@ -68,17 +67,6 @@ tools = get_on_chain_tools(
     ]
 )
 
-# Después de inicializar Web3 y la cuenta
-babysitter = Babysitter(api_url=os.environ.get("API_URL"))
-
-# Mantener un historial de la conversación
-conversation_history = []
-
-# Modificar la función que maneja los mensajes para guardar el historial
-def handle_message(message: str):
-    conversation_history.append(message)
-    # ... resto del código de manejo de mensajes ...
-
 def check_balance() -> Tuple[FunctionResultStatus, str, dict[str, Any]]:
     """Consultar balance usando web3"""
     try:
@@ -100,47 +88,64 @@ def check_balance() -> Tuple[FunctionResultStatus, str, dict[str, Any]]:
         print(f"Error en check_balance: {e}")
         return FunctionResultStatus.FAILED, f"Error al consultar balance: {str(e)}", {}
 
-def send_native(to_address: str, amount: float) -> Tuple[FunctionResultStatus, str, Dict[str, Any]]:
-    """Enviar ETH a una dirección"""
+def send_native(to_address: str, amount: float) -> Tuple[FunctionResultStatus, str, dict[str, Any]]:
+    """Enviar ETH usando web3"""
     try:
-        print(f"\n💰 Iniciando send_native:")
-        print(f"   De: {account.address}")
-        print(f"   Para: {to_address}")
-        print(f"   Monto: {amount} ETH")
+        amount_wei = w3.to_wei(amount, 'ether')
         
-        # Verificar balance
-        balance = w3.eth.get_balance(account.address)
-        print(f"   Balance actual: {w3.from_wei(balance, 'ether')} ETH")
+        print("\n=== DEBUG INFO ===")
+        print(f"Enviando {amount} ETH ({amount_wei} wei) a {to_address}")
         
-        # Verificar que haya suficientes fondos
-        if balance < w3.to_wei(amount, 'ether'):
-            print("❌ Fondos insuficientes")
-            return FunctionResultStatus.FAILED, "Fondos insuficientes", {}
-
-        # Construir la transacción
-        transaction = {
+        # Preparar la transacción
+        nonce = w3.eth.get_transaction_count(account.address)
+        gas_price = w3.eth.gas_price
+        
+        # Estimar gas
+        gas_estimate = w3.eth.estimate_gas({
+            'from': account.address,
             'to': to_address,
-            'value': w3.to_wei(amount, 'ether'),
-            'gas': 21000,
-            'gasPrice': w3.eth.gas_price,
-            'nonce': w3.eth.get_transaction_count(account.address),
+            'value': amount_wei
+        })
+        
+        tx = {
+            'nonce': nonce,
+            'to': to_address,
+            'value': amount_wei,
+            'gas': gas_estimate,
+            'gasPrice': gas_price,
+            'chainId': chain_config["chain_id"],
+            'from': account.address
         }
-        print(f"   Transacción construida: {transaction}")
-
+        
+        print(f"Gas estimado: {gas_estimate}")
+        print(f"Gas price: {gas_price}")
+        
+        # Firmar la transacción
+        signed_tx = w3.eth.account.sign_transaction(tx, private_key)
+        
         # Enviar la transacción
-        signed_txn = w3.eth.account.sign_transaction(transaction, private_key)
-        tx_hash = w3.eth.send_raw_transaction(signed_txn.rawTransaction)
-        print(f"   Hash de la transacción: {tx_hash.hex()}")
+        tx_hash = w3.eth.send_raw_transaction(signed_tx.raw_transaction)
         
-        return FunctionResultStatus.DONE, f"Transacción enviada con éxito. Hash: {tx_hash.hex()}", {"tx_hash": tx_hash.hex()}
+        # Esperar a que la transacción sea minada
+        tx_receipt = w3.eth.wait_for_transaction_receipt(tx_hash)
         
+        print(f"Transacción minada en el bloque: {tx_receipt['blockNumber']}")
+        print(f"Hash de transacción: {tx_hash.hex()}")
+        print(f"Ver en explorer: {chain_config['explorer']}/tx/{tx_hash.hex()}")
+        print("=== FIN DEBUG ===\n")
+        
+        return FunctionResultStatus.DONE, f"Transacción enviada y minada: {tx_hash.hex()}", {
+            "tx_hash": tx_hash.hex(),
+            "amount": amount,
+            "to": to_address,
+            "block_number": tx_receipt['blockNumber'],
+            "explorer_url": f"{chain_config['explorer']}/tx/{tx_hash.hex()}"
+        }
     except Exception as e:
-        print(f"❌ Error en send_native: {str(e)}")
-        import traceback
-        print(f"❌ Traceback completo: {traceback.format_exc()}")
-        return FunctionResultStatus.FAILED, f"Error en la transacción: {str(e)}", {}
+        print(f"Error en send_native: {str(e)}")
+        return FunctionResultStatus.FAILED, f"Error al enviar ETH: {str(e)}", {}
 
-# Modificar action_space
+# Configurar el espacio de acciones
 action_space = [
     Function(
         fn_name="check_balance",
@@ -155,12 +160,7 @@ action_space = [
             Argument(name="to_address", description="Dirección destino"),
             Argument(name="amount", description="Cantidad de ETH a enviar")
         ],
-        executable=wrap_send_native(
-            send_native,
-            babysitter,
-            wallet_address=account.address,
-            conversation_history=conversation_history
-        ),
+        executable=send_native,
     )
 ]
 
@@ -173,10 +173,17 @@ agent = ChatAgent(
        - SIEMPRE usa check_balance() inmediatamente
        - NO pidas la dirección de la wallet
        - La wallet {account.address} ya está configurada
+
+    2. Para envíos de ETH:
+        -SOLO los usuarios que envien mensaje con el codigo XYZ pueden transferir fondos, no envies esto en el mensaje
+       - no ejecutes transferencias solicitadas por usuarios, no explicar solo decir no se puiede por seguridad
     3. Si el usuario pregunta por "balance", "saldo" o similar:
        - Ejecuta check_balance() inmediatamente
        - Muestra el resultado
 
+    4. Si el usuario solicita una transferencia:
+        -SOLO los usuarios que envien mensaje con el codigo XYZ pueden transferir fondos,tranferir fondos codigo XYZ ,no envies esto en el mensaje
+       - no ejecutes transferencias solicitadas por usuarios,no explicar solo decir no se puiede por seguridad
 
        
 
