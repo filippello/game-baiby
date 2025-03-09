@@ -1,3 +1,41 @@
+# DEMO folder
+files are in src folder
+
+# Chat Blockchain Integration
+
+## Overview
+A secure blockchain chat interface with transaction validation.
+
+## Components
+
+### 1. `chat_blockchain.py`
+- Manages chat interface
+- Handles blockchain transactions
+- Processes user commands
+
+### 2. `baibysitter.py`
+- Validates all transactions
+- Communicates with security API
+- Tracks conversation history
+
+## Flow
+```
+User → Chat Interface → Babysitter Validation → Transaction Execution
+```
+
+## Security Features
+- External API validation
+- Code-based authorization
+- Automatic system halt
+
+## Usage
+```
+1. Set environment variables
+2.Start chat interface
+3. Input commands
+4. System validates and executes
+```
+
 # GAME Python SDK Library
 The GAME Python SDK is a library that allows you interact and develop agents powered by the GAME architecture.
 
