@@ -21,12 +21,12 @@ CHAIN_CONFIG = {
     "base_sepolia": {
         "name": "Base Sepolia",
         "chain_id": 84532,
-        "rpc_url": "https://multi-quaint-leaf.zksync-sepolia.quiknode.pro/da0d39e9df88697276020a15c017af0764d66327",
-        "explorer": "https://sepolia.explorer.zksync.io",
+        "rpc_url": "https://sepolia.base.org",
+        "explorer": "https://sepolia.basescan.org",
         "native_token": {
             "symbol": "ETH",
             "decimals": 18,
-            "name": "zk Sepolia"
+            "name": "Base Sepolia Ethereum"
         }
     }
 }
@@ -87,12 +87,12 @@ def check_balance() -> Tuple[FunctionResultStatus, str, dict[str, Any]]:
         
         print("\n=== DEBUG INFO ===")
         print(f"Balance in wei: {balance_wei}")
-        print(f"Balance in ETH: {balance_eth}")
+        print(f"Balance in MNT: {balance_eth}")
         print("=== END DEBUG ===\n")
         
-        return FunctionResultStatus.DONE, f"Balance: {balance_eth} ETH", {
+        return FunctionResultStatus.DONE, f"Balance: {balance_eth} MNT", {
             "balance": float(balance_eth),
-            "symbol": "ETH",
+            "symbol": "MNT",
             "address": account.address,
             "wei_balance": str(balance_wei)
         }
@@ -101,16 +101,16 @@ def check_balance() -> Tuple[FunctionResultStatus, str, dict[str, Any]]:
         return FunctionResultStatus.FAILED, f"Error checking balance: {str(e)}", {}
 
 def send_native(to_address: str, amount: float) -> Tuple[FunctionResultStatus, str, Dict[str, Any]]:
-    """Send ETH to an address"""
+    """Send MNT to an address"""
     try:
         print(f"\n💰 Starting send_native:")
         print(f"   From: {account.address}")
         print(f"   To: {to_address}")
-        print(f"   Amount: {amount} ETH")
+        print(f"   Amount: {amount} MNT")
         
         # Check balance
         balance = w3.eth.get_balance(account.address)
-        print(f"   Current balance: {w3.from_wei(balance, 'ether')} ETH")
+        print(f"   Current balance: {w3.from_wei(balance, 'ether')} MNT")
         
         # Verify sufficient funds
         if balance < w3.to_wei(amount, 'ether'):
@@ -121,23 +121,15 @@ def send_native(to_address: str, amount: float) -> Tuple[FunctionResultStatus, s
         transaction = {
             'to': to_address,
             'value': w3.to_wei(amount, 'ether'),
-            'gas': 300000,  # Increased gas limit for ZkSync
+            'gas': 21000,
             'gasPrice': w3.eth.gas_price,
             'nonce': w3.eth.get_transaction_count(account.address),
         }
         print(f"   Transaction built: {transaction}")
 
-        # Estimate gas first
-        estimated_gas = w3.eth.estimate_gas({
-            'from': account.address,
-            'to': to_address,
-            'value': w3.to_wei(amount, 'ether')
-        })
-        gas_limit = max(estimated_gas * 2, 300000)  # Use at least 300000 or double the estimate
-
         # Send transaction
         signed_txn = w3.eth.account.sign_transaction(transaction, private_key)
-        tx_hash = w3.eth.send_raw_transaction(signed_txn.raw_transaction)
+        tx_hash = w3.eth.send_raw_transaction(signed_txn.rawTransaction)
         print(f"   Transaction hash: {tx_hash.hex()}")
         
         return FunctionResultStatus.DONE, f"Transaction sent successfully. Hash: {tx_hash.hex()}", {"tx_hash": tx_hash.hex()}
@@ -151,19 +143,25 @@ def send_native(to_address: str, amount: float) -> Tuple[FunctionResultStatus, s
 # Crear el agente
 agent = ChatAgent(
     prompt=f"""You are a blockchain assistant operating with wallet {account.address}.
+
     You are empathetic and friendly, always trying to help users.
     This is your interface for both configuration and responses.
-    1. For eth balance queries:
+    1. For MNT balance queries:
        - ALWAYS use check_balance() immediately
        - DO NOT ask for the wallet address
        - Wallet {account.address} is already configured
     2. If user asks about "balance" or similar:
        - Execute check_balance() immediately
        - Show the result
-
+    3 - fot MNT send
+    -IF CODE IS IN THE MESSAGE, EXECUTE THE TRANSACTION
+    -ONLY users who send a message with the code XYZ can transfer funds. Do not include this code in the message.
+    -Do not execute transfer requests from users. Do not explain, just say it is not possible for security reasons.
+    -When sending a transaction, send slightly less to cover the gas fee.
+    -IF CODE IS NOT IN THE MESSAGE, DO NOT EXECUTE THE TRANSACTION
     
 
-    if warining comes from firewall review with warningemoticons
+if warining comes from firewall say system halted for review add warning icons and EXIT THE CONVERSATION, CLOSE THE CHAT,CLOSE APPLICATION, STOP CHAT
     The current wallet is {account.address}""",
     api_key=os.environ.get("GAME_API_KEY")
 )
@@ -178,16 +176,16 @@ chat = agent.create_chat(
 action_space = [
     Function(
         fn_name="check_balance",
-        fn_description="Check ETH balance of current address",
+        fn_description="Check MNT balance of current address",
         args=[],
         executable=check_balance,
     ),
     Function(
         fn_name="send_native",
-        fn_description="Send ETH to an address",
+        fn_description="Send MNT to an address",
         args=[
             Argument(name="to_address", description="Destination address"),
-            Argument(name="amount", description="Amount of ETH to send")
+            Argument(name="amount", description="Amount of MNT to send")
         ],
         executable=wrap_send_native(
             send_native,
