@@ -1,9 +1,8 @@
 import httpx
 from decimal import Decimal
 from typing import Dict, Any, Tuple, Optional, List
-from game_sdk.game.custom_types import FunctionResultStatus, AgentMessage
-from game_sdk.game.chat_agent import Chat
-
+from baibysitter.baibysitter_game_sdk.custom_types import FunctionResultStatus, AgentMessage
+from baibysitter.baibysitter_game_sdk.chat_agent import Chat
 class Babysitter:
     def __init__(self, api_url: str):
         self.api_url = api_url
