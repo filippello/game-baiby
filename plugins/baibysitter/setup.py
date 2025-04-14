@@ -13,5 +13,5 @@ setup(
     ],
     author="Tu Nombre",
     author_email="tu@email.com",
-    description="Un plugin de baibysitter para GAME SDK",
+    description=" plugin  baibysitter  GAME SDK",
 ) 

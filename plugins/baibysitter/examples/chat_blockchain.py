@@ -22,7 +22,7 @@ CHAIN_CONFIG = {
     "base_sepolia": {
         "name": "Base Sepolia",
         "chain_id": 84532,
-        "rpc_url": "https://multi-quaint-leaf.zksync-sepolia.quiknode.pro/da0d39e9df88697276020a15c017af0764d66327",
+        "rpc_url": "",
         "explorer": "https://sepolia.basescan.org/",
         "native_token": {
             "symbol": "ETH",
