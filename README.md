@@ -1,4 +1,4 @@
-# Baibysitter Plugin - Documentation
+# Baibysitter Plugin for G.A.M.E - Documentation
 
 ## Description
 
