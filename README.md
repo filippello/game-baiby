@@ -1,6 +1,7 @@
 # Baibysitter Plugin for G.A.M.E - Documentation
 
-![Image](https://github.com/user-attachments/assets/81ad7e35-5ed7-4555-b8c5-73cd5f8b9834)
+<img src="https://github.com/user-attachments/assets/81ad7e35-5ed7-4555-b8c5-73cd5f8b9834" width="300"/>
+
 
 ## Description
 
