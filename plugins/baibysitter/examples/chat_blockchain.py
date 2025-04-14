@@ -1,4 +1,5 @@
 import os
+import traceback
 from typing import Any, Tuple, Dict
 from dotenv import load_dotenv
 from pathlib import Path
@@ -22,11 +23,11 @@ CHAIN_CONFIG = {
         "name": "Base Sepolia",
         "chain_id": 84532,
         "rpc_url": "https://multi-quaint-leaf.zksync-sepolia.quiknode.pro/da0d39e9df88697276020a15c017af0764d66327",
-        "explorer": "https://sepolia.explorer.zksync.io",
+        "explorer": "https://sepolia.basescan.org/",
         "native_token": {
             "symbol": "ETH",
             "decimals": 18,
-            "name": "zk Sepolia"
+            "name": "base sepolia"
         }
     }
 }
@@ -100,51 +101,35 @@ def check_balance() -> Tuple[FunctionResultStatus, str, dict[str, Any]]:
         print(f"Error in check_balance: {e}")
         return FunctionResultStatus.FAILED, f"Error checking balance: {str(e)}", {}
 
-def send_native(to_address: str, amount: float) -> Tuple[FunctionResultStatus, str, Dict[str, Any]]:
-    """Send ETH to an address"""
+def send_native(to_address: str, amount: float) -> Tuple[FunctionResultStatus, str, dict[str, Any]]:
     try:
         print(f"\n💰 Starting send_native:")
         print(f"   From: {account.address}")
         print(f"   To: {to_address}")
         print(f"   Amount: {amount} ETH")
         
-        # Check balance
         balance = w3.eth.get_balance(account.address)
-        print(f"   Current balance: {w3.from_wei(balance, 'ether')} ETH")
+        eth_balance = w3.from_wei(balance, 'ether')
+        print(f"   Current balance: {eth_balance} ETH")
         
-        # Verify sufficient funds
-        if balance < w3.to_wei(amount, 'ether'):
-            print("❌ Insufficient funds")
-            return FunctionResultStatus.FAILED, "Insufficient funds", {}
-
-        # Build transaction
         transaction = {
             'to': to_address,
             'value': w3.to_wei(amount, 'ether'),
-            'gas': 300000,  # Increased gas limit for ZkSync
+            'gas': 300000,
             'gasPrice': w3.eth.gas_price,
             'nonce': w3.eth.get_transaction_count(account.address),
+            'chainId': w3.eth.chain_id
         }
+        
         print(f"   Transaction built: {transaction}")
-
-        # Estimate gas first
-        estimated_gas = w3.eth.estimate_gas({
-            'from': account.address,
-            'to': to_address,
-            'value': w3.to_wei(amount, 'ether')
-        })
-        gas_limit = max(estimated_gas * 2, 300000)  # Use at least 300000 or double the estimate
-
-        # Send transaction
+        
         signed_txn = w3.eth.account.sign_transaction(transaction, private_key)
         tx_hash = w3.eth.send_raw_transaction(signed_txn.raw_transaction)
-        print(f"   Transaction hash: {tx_hash.hex()}")
         
-        return FunctionResultStatus.DONE, f"Transaction sent successfully. Hash: {tx_hash.hex()}", {"tx_hash": tx_hash.hex()}
+        return FunctionResultStatus.DONE, f"Transaction sent with hash: {tx_hash.hex()}", {}
         
     except Exception as e:
         print(f"❌ Error in send_native: {str(e)}")
-        import traceback
         print(f"❌ Complete traceback: {traceback.format_exc()}")
         return FunctionResultStatus.FAILED, f"Transaction error: {str(e)}", {}
 
@@ -227,4 +212,4 @@ while chat_continue:
         chat_continue = False
         break
 
-print("Chat ended") 
+print("Chat ended")
