@@ -1,5 +1,7 @@
 # Baibysitter Plugin for G.A.M.E - Documentation
 
+![Image](https://github.com/user-attachments/assets/81ad7e35-5ed7-4555-b8c5-73cd5f8b9834)
+
 ## Description
 
 Baibysitter is a plugin designed to monitor and validate blockchain transactions within conversations with AI agents.
